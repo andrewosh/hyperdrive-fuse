@@ -1,0 +1,43 @@
+{
+  "name": "hyperfuse",
+  "version": "1.0.0",
+  "description": "A FUSE filesystem for Hyperdrive",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "bin": {
+    "hyperfuse": "./cli.js"
+  },
+  "scripts": {
+    "test": "tape test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrewosh/hyperdrive-fuse.git"
+  },
+  "keywords": [
+    "hyperdrive",
+    "fuse"
+  ],
+  "author": "Andrew Osheroff <andrewosh@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andrewosh/hyperdrive-fuse/issues"
+  },
+  "homepage": "https://github.com/andrewosh/hyperdrive-fuse#readme",
+  "devDependencies": {
+    "random-access-memory": "^3.1.1",
+    "rimraf": "^2.6.3",
+    "standard": "^12.0.1",
+    "tape": "^4.10.1"
+  },
+  "dependencies": {
+    "chalk": "^2.4.2",
+    "corestore": "^1.1.5",
+    "dat-encoding": "^5.0.1",
+    "fuse-bindings": "^2.11.2",
+    "hyperdrive": "git+https://github.com/andrewosh/hyperdrive.git#v10",
+    "minimist": "^1.2.0"
+  }
+}
