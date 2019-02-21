@@ -11,6 +11,8 @@ function getHandlers (drive) {
     debug('getattr', path)
     drive.stat(path, (err, stat) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
+      console.log('stat for', path, 'is', stat)
+      delete stat.blocks
       return cb(0, stat)
     })
   }
@@ -39,19 +41,34 @@ function getHandlers (drive) {
     })
   }
 
+  handlers.releasedir = function (path, handle, cb) {
+    // TODO: What to do here?
+    return cb(0)
+  }
+
   handlers.read = function (path, handle, buf, len, offset, cb) {
     debug('read', path, handle, len, offset)
-    drive.read(handle, buf, offset, len, (err, bytesRead) => {
+    drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
       if (err) return cb(-err.errno || fuse.EBADF)
+      console.log('bytesRead:', bytesRead)
       return cb(bytesRead)
     })
   }
 
   handlers.write = function (path, handle, buf, len, offset, cb) {
     debug('write', path, handle, len, offset)
-    drive.write(handle, buf, offset, len, (err, bytesWritten) => {
+    drive.write(handle, buf, 0, len, (err, bytesWritten) => {
+      console.log('write error:', err)
       if (err) return cb(-err.errno || fuse.EBADF)
       return cb(bytesWritten)
+    })
+  }
+
+  handlers.truncate = function (path, size, cb) {
+    debug('truncate', path, size)
+    drive.truncate(path, size, err => {
+      if (err) return cb(-err.errno || fuse.EPERM)
+      return cb(0)
     })
   }
 
@@ -82,14 +99,25 @@ function getHandlers (drive) {
   handlers.create = function (path, mode, cb) {
     debug('create', path, mode)
     drive.writeFile(path, Buffer.alloc(0), { mode }, err => {
-      if (err) return cb(-err.errno || fuse.EPERM)
+      if (err) return cb(err)
+      drive.open(path, 'w', (err, fd) => {
+        if (err) return cb(-err.errno || fuse.ENOENT)
+        return cb(0, fd)
+      })
+    })
+  }
+
+  handlers.chown = function (path, uid, gid, cb) {
+    debug('chown', path, uid, gid)
+    drive._update(path, { uid, gid }, err => {
+      if (err) return cb(fuse.EPERM)
       return cb(0)
     })
   }
 
   handlers.utimens = function (path, actime, modtime, cb) {
     debug('utimens', path, actime, modtime)
-    drive.updateMetadata(path, {
+    drive._update(path, {
       atim: actime.getTime(),
       mtim: modtime.getTime()
     }, err => {

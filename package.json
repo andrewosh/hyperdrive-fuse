@@ -37,7 +37,7 @@
     "corestore": "^1.1.5",
     "dat-encoding": "^5.0.1",
     "fuse-bindings": "^2.11.2",
-    "hyperdrive": "git+https://github.com/andrewosh/hyperdrive.git#v10",
+    "hyperdrive": "git+https://github.com/andrewosh/hyperdrive.git#fuse-testing",
     "minimist": "^1.2.0"
   }
 }
