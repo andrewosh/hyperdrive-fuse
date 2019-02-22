@@ -7,7 +7,7 @@ const chalk = require('chalk')
 const { mount } = require('.')
 
 const args = minimist(process.argv.slice(2), {
-  string: ['key', 'mnt', 'storage'],
+  string: ['key', 'mnt', 'storage', 'port'],
   boolean: ['debug'],
   default: {
     debug: false
@@ -17,7 +17,7 @@ const key = args.key ?  datEncoding.decode(args.key) : null
 
 async function run () {
   try {
-    const { key: mountedKey } = await mount(key, args.mnt, { dir: args.dir, debug: args.debug })
+    const { key: mountedKey } = await mount(key, args.mnt, { dir: args.dir, debug: args.debug, port: args.port })
     console.log(chalk.green(`Mounted key ${mountedKey} at ${args.mnt}`))
   } catch (err) {
     throw err

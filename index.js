@@ -1,4 +1,5 @@
 const mkdirp = require('mkdirp')
+const datEncoding = require('dat-encoding')
 const fuse = require('fuse-bindings')
 const corestore = require('corestore')
 const hyperdrive = require('hyperdrive')
@@ -11,7 +12,6 @@ function getHandlers (drive) {
     debug('getattr', path)
     drive.stat(path, (err, stat) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
-      console.log('stat for', path, 'is', stat)
       delete stat.blocks
       return cb(0, stat)
     })
@@ -50,7 +50,6 @@ function getHandlers (drive) {
     debug('read', path, handle, len, offset)
     drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
       if (err) return cb(-err.errno || fuse.EBADF)
-      console.log('bytesRead:', bytesRead)
       return cb(bytesRead)
     })
   }
@@ -58,7 +57,6 @@ function getHandlers (drive) {
   handlers.write = function (path, handle, buf, len, offset, cb) {
     debug('write', path, handle, len, offset)
     drive.write(handle, buf, 0, len, (err, bytesWritten) => {
-      console.log('write error:', err)
       if (err) return cb(-err.errno || fuse.EBADF)
       return cb(bytesWritten)
     })
@@ -98,7 +96,7 @@ function getHandlers (drive) {
 
   handlers.create = function (path, mode, cb) {
     debug('create', path, mode)
-    drive.writeFile(path, Buffer.alloc(0), { mode }, err => {
+    drive.create(path, { mode }, err => {
       if (err) return cb(err)
       drive.open(path, 'w', (err, fd) => {
         if (err) return cb(-err.errno || fuse.ENOENT)
@@ -118,8 +116,8 @@ function getHandlers (drive) {
   handlers.utimens = function (path, actime, modtime, cb) {
     debug('utimens', path, actime, modtime)
     drive._update(path, {
-      atim: actime.getTime(),
-      mtim: modtime.getTime()
+      atime: actime.getTime(),
+      mtime: modtime.getTime()
     }, err => {
       if (err) return cb(fuse.EPERM)
       return cb(0)
@@ -159,7 +157,11 @@ async function mount (key, mnt, opts, cb) {
   if (typeof opts === 'function') return mount(key, mnt, null, opts)
   opts = opts || {}
 
-  const store = corestore(opts.dir || './storage')
+  const store = corestore(opts.dir || './storage', {
+    network: {
+      port: opts.port || 3000
+    }
+  })
 
   const prom = new Promise(async (resolve, reject) => {
     await store.ready()
@@ -181,7 +183,8 @@ async function mount (key, mnt, opts, cb) {
         if (err) return reject(err)
         fuse.mount(mnt, handlers, err => {
           if (err) return reject(err)
-          return resolve({mnt, handlers, key })
+          const keyString = datEncoding.encode(key || drive.key.toString('hex'))
+          return resolve({mnt, handlers, key: keyString })
         })
       })
     })
