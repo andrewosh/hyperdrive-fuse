@@ -17,7 +17,7 @@ const key = args.key ?  datEncoding.decode(args.key) : null
 
 async function run () {
   try {
-    const { key: mountedKey } = await mount(key, args.mnt, { dir: args.dir, debug: args.debug, port: args.port })
+    const { key: mountedKey } = await mount(key, args.mnt, args)
     console.log(chalk.green(`Mounted key ${mountedKey} at ${args.mnt}`))
   } catch (err) {
     throw err

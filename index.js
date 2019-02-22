@@ -157,7 +157,7 @@ async function mount (key, mnt, opts, cb) {
   if (typeof opts === 'function') return mount(key, mnt, null, opts)
   opts = opts || {}
 
-  const store = corestore(opts.dir || './storage', {
+  const store = corestore(opts.storage || './storage', {
     network: {
       port: opts.port || 3000
     }
