@@ -38,6 +38,7 @@
     "dat-encoding": "^5.0.1",
     "fuse-bindings": "^2.11.2",
     "hyperdrive": "git+https://github.com/andrewosh/hyperdrive.git#fuse-testing",
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "mutexify": "^1.2.0"
   }
 }

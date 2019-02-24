@@ -184,7 +184,7 @@ async function mount (key, mnt, opts, cb) {
         fuse.mount(mnt, handlers, err => {
           if (err) return reject(err)
           const keyString = datEncoding.encode(key || drive.key.toString('hex'))
-          return resolve({mnt, handlers, key: keyString })
+          return resolve({mnt, handlers, key: keyString, drive })
         })
       })
     })
@@ -205,7 +205,22 @@ async function mount (key, mnt, opts, cb) {
   return prom
 }
 
+function unmount (mnt, cb) {
+  const prom = new Promise((resolve, reject) => {
+    fuse.unmount(mnt, err => {
+      if (err) return reject(err)
+      return resolve(err)
+    })
+  })
+  if (cb) {
+    prom.then(() => cb(null))
+    prom.catch(err => cb(err))
+  }
+  return prom
+}
+
 module.exports = {
   mount,
+  unmount,
   getHandlers
 }
