@@ -170,6 +170,7 @@ async function mount (key, mnt, opts, cb) {
       return store.get(key, opts)
     }
     opts.factory = true
+    opts.sparse = true
     const drive = hyperdrive(factory, key, opts)
 
     const handlers = getHandlers(drive)
