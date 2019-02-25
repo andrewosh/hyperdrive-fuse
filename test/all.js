@@ -4,7 +4,7 @@ const rimraf = require('rimraf')
 const { mount, unmount } = require('..')
 
 test('can read/write a huge file', async t => {
-  const { drive } = await mount(null, './mnt')
+  const { drive, store } = await mount(null, './mnt')
 
   // Copied from hyperdrive fd tests
 
@@ -37,24 +37,26 @@ test('can read/write a huge file', async t => {
   } catch (err) {
     t.fail(err)
     await close(fd)
-    await cleanup()
+    await cleanup(store)
   }
 
-  await cleanup()
+  await cleanup(store)
   t.pass('all slices matched')
   t.end()
 })
 
 
-function cleanup () {
+function cleanup (store) {
   return new Promise((resolve, reject) => {
-    unmount('./mnt', err => {
-      if (err) return reject(err)
-      rimraf('./mnt', err => {
+    store.close().then(() => {
+      unmount('./mnt', err => {
         if (err) return reject(err)
-        return resolve()
+        rimraf('./mnt', err => {
+          if (err) return reject(err)
+          return resolve()
+        })
       })
-    })
+    }).catch(err => reject(err))
   })
 }
 

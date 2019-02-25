@@ -12,7 +12,6 @@ function getHandlers (drive) {
     debug('getattr', path)
     drive.stat(path, (err, stat) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
-      delete stat.blocks
       return cb(0, stat)
     })
   }
@@ -56,6 +55,11 @@ function getHandlers (drive) {
 
   handlers.write = function (path, handle, buf, len, offset, cb) {
     debug('write', path, handle, len, offset)
+
+    // TODO: Duplicating the input buffer is a temporary patch for a race condition.
+    // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
+    buf = Buffer.from(buf)
+
     drive.write(handle, buf, 0, len, (err, bytesWritten) => {
       if (err) return cb(-err.errno || fuse.EBADF)
       return cb(bytesWritten)
@@ -96,7 +100,7 @@ function getHandlers (drive) {
 
   handlers.create = function (path, mode, cb) {
     debug('create', path, mode)
-    drive.create(path, { mode }, err => {
+    drive.create(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
       if (err) return cb(err)
       drive.open(path, 'w', (err, fd) => {
         if (err) return cb(-err.errno || fuse.ENOENT)
@@ -108,6 +112,14 @@ function getHandlers (drive) {
   handlers.chown = function (path, uid, gid, cb) {
     debug('chown', path, uid, gid)
     drive._update(path, { uid, gid }, err => {
+      if (err) return cb(fuse.EPERM)
+      return cb(0)
+    })
+  }
+
+  handlers.chmod = function (path, mode, cb) {
+    debug('chmod', path, mode)
+    drive._update(path, { mode }, err => {
       if (err) return cb(fuse.EPERM)
       return cb(0)
     })
@@ -169,8 +181,14 @@ async function mount (key, mnt, opts, cb) {
     const factory = function (key, opts) {
       return store.get(key, opts)
     }
-    opts.factory = true
-    opts.sparse = true
+
+    opts = {
+      ...opts,
+      factory: true,
+      sparse: true,
+      sparseMetadata: true
+    }
+
     const drive = hyperdrive(factory, key, opts)
 
     const handlers = getHandlers(drive)
@@ -185,7 +203,7 @@ async function mount (key, mnt, opts, cb) {
         fuse.mount(mnt, handlers, err => {
           if (err) return reject(err)
           const keyString = datEncoding.encode(key || drive.key.toString('hex'))
-          return resolve({mnt, handlers, key: keyString, drive })
+          return resolve({mnt, handlers, key: keyString, drive, store })
         })
       })
     })
