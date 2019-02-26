@@ -1,13 +1,10 @@
 {
-  "name": "hyperfuse",
+  "name": "hyperdrive-fuse",
   "version": "1.0.0",
-  "description": "A FUSE filesystem for Hyperdrive",
+  "description": "FUSE bindings for Hyperdrive",
   "main": "index.js",
   "directories": {
     "test": "test"
-  },
-  "bin": {
-    "hyperfuse": "./cli.js"
   },
   "scripts": {
     "test": "tape test/*.js"
@@ -27,18 +24,14 @@
   },
   "homepage": "https://github.com/andrewosh/hyperdrive-fuse#readme",
   "devDependencies": {
+    "hyperdrive": "git+https://github.com/mafintosh/hyperdrive#v10",
     "random-access-memory": "^3.1.1",
     "rimraf": "^2.6.3",
     "standard": "^12.0.1",
     "tape": "^4.10.1"
   },
   "dependencies": {
-    "chalk": "^2.4.2",
-    "corestore": "^1.1.5",
     "dat-encoding": "^5.0.1",
-    "fuse-bindings": "^2.11.2",
-    "hyperdrive": "git+https://github.com/andrewosh/hyperdrive.git#fuse-testing",
-    "minimist": "^1.2.0",
-    "mutexify": "^1.2.0"
+    "fuse-bindings": "^2.11.2"
   }
 }

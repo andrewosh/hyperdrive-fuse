@@ -1,9 +1,7 @@
-const mkdirp = require('mkdirp')
 const datEncoding = require('dat-encoding')
+const mkdirp = require('mkdirp')
 const fuse = require('fuse-bindings')
-const corestore = require('corestore')
-const hyperdrive = require('hyperdrive')
-const debug = require('debug')('hyperfuse')
+const debug = require('debug')('hyperdrive-fuse')
 
 function getHandlers (drive) {
   const handlers = {}
@@ -165,63 +163,37 @@ function getHandlers (drive) {
   return handlers
 }
 
-async function mount (key, mnt, opts, cb) {
-  if (typeof opts === 'function') return mount(key, mnt, null, opts)
-  opts = opts || {}
-
-  const store = corestore(opts.storage || './storage', {
-    network: {
-      port: opts.port || 3000
-    }
-  })
-
-  const prom = new Promise(async (resolve, reject) => {
-    await store.ready()
-
-    const factory = function (key, opts) {
-      return store.get(key, opts)
-    }
-
-    opts = {
-      ...opts,
-      factory: true,
-      sparse: true,
-      sparseMetadata: true
-    }
-
-    const drive = hyperdrive(factory, key, opts)
-
-    const handlers = getHandlers(drive)
-    handlers.options = []
-    // handlers.options = ['allow_other']
-    if (opts.debug) handlers.options.push('debug')
-
-    mkdirp(mnt, err => {
-      if (err) return reject(err)
-      drive.ready(err => {
-        if (err) return reject(err)
-        fuse.mount(mnt, handlers, err => {
-          if (err) return reject(err)
-          const keyString = datEncoding.encode(key || drive.key.toString('hex'))
-          return resolve({mnt, handlers, key: keyString, drive, store })
-        })
-      })
-    })
-  })
+async function mount (drive, mnt, cb) {
+  const prom = ready()
   if (cb) {
     prom.catch(err => cb(err))
     prom.then(obj => cb(null, obj))
   }
 
-  process.on('SIGINT', async () => {
-    // This can throw.
-    await store.close()
-    fuse.unmount(mnt, err => {
-      if (err) console.error(err)
-    })
-  })
-
   return prom
+
+  async function ready () {
+    const handlers = getHandlers(drive)
+
+    // handlers.options = ['allow_other']
+    if (debug.enabled) {
+      handlers.options.push('debug')
+    }
+
+    return new Promise((resolve, reject) => {
+      mkdirp(mnt, err => {
+        if (err) return reject(err)
+        drive.ready(err => {
+          if (err) return reject(err)
+          fuse.mount(mnt, handlers, err => {
+            if (err) return reject(err)
+            const keyString = datEncoding.encode(drive.key)
+            return resolve({mnt, handlers, key: keyString, drive })
+          })
+        })
+      })
+    })
+  }
 }
 
 function unmount (mnt, cb) {
@@ -238,8 +210,5 @@ function unmount (mnt, cb) {
   return prom
 }
 
-module.exports = {
-  mount,
-  unmount,
-  getHandlers
-}
+module.exports = { mount, unmount }
+

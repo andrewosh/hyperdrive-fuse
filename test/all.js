@@ -1,12 +1,13 @@
 const fs = require('fs')
 const test = require('tape')
+const hyperdrive = require('hyperdrive')
+const ram = require('random-access-memory')
 const rimraf = require('rimraf')
 const { mount, unmount } = require('..')
 
 test('can read/write a huge file', async t => {
-  const { drive, store } = await mount(null, './mnt')
-
-  // Copied from hyperdrive fd tests
+  const drive = hyperdrive(ram)
+  await mount(drive, './mnt')
 
   const NUM_SLICES = 100
   const SLICE_SIZE = 4096
@@ -37,26 +38,25 @@ test('can read/write a huge file', async t => {
   } catch (err) {
     t.fail(err)
     await close(fd)
-    await cleanup(store)
+    await cleanup()
   }
 
-  await cleanup(store)
   t.pass('all slices matched')
+
+  await cleanup()
   t.end()
 })
 
 
-function cleanup (store) {
+function cleanup () {
   return new Promise((resolve, reject) => {
-    store.close().then(() => {
-      unmount('./mnt', err => {
+    unmount('./mnt', err => {
+      if (err) return reject(err)
+      rimraf('./mnt', err => {
         if (err) return reject(err)
-        rimraf('./mnt', err => {
-          if (err) return reject(err)
-          return resolve()
-        })
+        return resolve()
       })
-    }).catch(err => reject(err))
+    })
   })
 }
 
