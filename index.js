@@ -1,6 +1,11 @@
+const os = require('os')
+
 const datEncoding = require('dat-encoding')
 const mkdirp = require('mkdirp')
 const fuse = require('fuse-bindings')
+const fsConstants = require('filesystem-constants')
+const { translate, linux } = fsConstants
+
 const debug = require('debug')('hyperdrive-fuse')
 
 function getHandlers (drive) {
@@ -24,6 +29,12 @@ function getHandlers (drive) {
 
   handlers.open = function (path, flags, cb) {
     debug('open', path, flags)
+
+    const platform = os.platform()
+    if (platform !== 'linux') {
+      flags = translate(fsConstants[platform], linux, flags)
+    }
+
     drive.open(path, flags, (err, fd) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       return cb(0, fd)
@@ -188,7 +199,7 @@ async function mount (drive, mnt, cb) {
           fuse.mount(mnt, handlers, err => {
             if (err) return reject(err)
             const keyString = datEncoding.encode(drive.key)
-            return resolve({mnt, handlers, key: keyString, drive })
+            return resolve({ mnt, handlers, key: keyString, drive })
           })
         })
       })
@@ -211,4 +222,3 @@ function unmount (mnt, cb) {
 }
 
 module.exports = { mount, unmount }
-

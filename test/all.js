@@ -14,7 +14,7 @@ test('can read/write a huge file', async t => {
   const READ_SIZE = Math.floor(4096 * 2.76)
 
   const content = Buffer.alloc(SLICE_SIZE * NUM_SLICES).fill('0123456789abcdefghijklmnopqrstuvwxyz')
-  let slices = new Array(NUM_SLICES).fill(0).map((_, i) => content.slice(SLICE_SIZE * i, SLICE_SIZE * (i+1)))
+  let slices = new Array(NUM_SLICES).fill(0).map((_, i) => content.slice(SLICE_SIZE * i, SLICE_SIZE * (i + 1)))
 
   let fd = await open('./mnt/hello', 'w+')
   for (let slice of slices) {
@@ -25,7 +25,7 @@ test('can read/write a huge file', async t => {
   fd = await open('./mnt/hello', 'r')
   let numReads = 0
 
-  try { 
+  try {
     do {
       const pos = numReads * READ_SIZE
       const buf = Buffer.alloc(READ_SIZE)
@@ -46,7 +46,6 @@ test('can read/write a huge file', async t => {
   await cleanup()
   t.end()
 })
-
 
 function cleanup () {
   return new Promise((resolve, reject) => {
@@ -71,7 +70,7 @@ function read (fd, buf, offset, len, pos) {
 
 function write (fd, buf, offset, len) {
   return new Promise((resolve, reject) => {
-    fs.write(fd, buf, offset, len,(err, bytesWritten) => {
+    fs.write(fd, buf, offset, len, (err, bytesWritten) => {
       if (err) return reject(err)
       return resolve(bytesWritten)
     })
@@ -95,6 +94,3 @@ function close (fd) {
     })
   })
 }
-
-
-
