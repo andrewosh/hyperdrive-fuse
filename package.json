@@ -1,6 +1,6 @@
 {
   "name": "hyperdrive-fuse",
-  "version": "1.0.0",
+  "version": "1.0.0-rc0",
   "description": "FUSE bindings for Hyperdrive",
   "main": "index.js",
   "directories": {
@@ -24,7 +24,8 @@
   },
   "homepage": "https://github.com/andrewosh/hyperdrive-fuse#readme",
   "devDependencies": {
-    "hyperdrive": "git+https://github.com/mafintosh/hyperdrive#v10",
+    "corestore": "^1.2.2",
+    "hyperdrive": "^10.0.0-rc0",
     "random-access-memory": "^3.1.1",
     "rimraf": "^2.6.3",
     "standard": "^12.0.1",
@@ -33,6 +34,6 @@
   "dependencies": {
     "dat-encoding": "^5.0.1",
     "filesystem-constants": "^1.0.0",
-    "fuse-bindings": "^2.11.2"
+    "fuse-native": "^1.0.0-rc0"
   }
 }

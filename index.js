@@ -2,7 +2,7 @@ const os = require('os')
 
 const datEncoding = require('dat-encoding')
 const mkdirp = require('mkdirp')
-const fuse = require('fuse-bindings')
+const fuse = require('fuse-native')
 const fsConstants = require('filesystem-constants')
 const { translate, linux } = fsConstants
 
@@ -221,4 +221,9 @@ function unmount (mnt, cb) {
   return prom
 }
 
-module.exports = { mount, unmount }
+module.exports = {
+  mount,
+  unmount,
+  configure: fuse.configure,
+  unconfigure: fuse.unconfigure
+}
