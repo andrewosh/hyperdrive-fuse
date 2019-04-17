@@ -15,6 +15,10 @@ function getHandlers (drive) {
     debug('getattr', path)
     drive.stat(path, (err, stat) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
+      if (path === '/') {
+        stat.uid = process.getuid()
+        stat.gid = process.getgid()
+      }
       return cb(0, stat)
     })
   }
@@ -187,6 +191,7 @@ async function mount (drive, mnt, cb) {
     const handlers = getHandlers(drive)
 
     // handlers.options = ['allow_other']
+    handlers.options = []
     if (debug.enabled) {
       handlers.options.push('debug')
     }
