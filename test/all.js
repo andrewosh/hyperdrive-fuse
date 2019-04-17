@@ -5,7 +5,7 @@ const ram = require('random-access-memory')
 const rimraf = require('rimraf')
 const { mount, unmount } = require('..')
 
-test('can read/write a huge file', async t => {
+test('can read/write a small file', async t => {
   const drive = hyperdrive(ram)
   await mount(drive, './mnt')
 
@@ -13,39 +13,82 @@ test('can read/write a huge file', async t => {
   const SLICE_SIZE = 4096
   const READ_SIZE = Math.floor(4096 * 2.76)
 
-  const content = Buffer.alloc(SLICE_SIZE * NUM_SLICES).fill('0123456789abcdefghijklmnopqrstuvwxyz')
-  let slices = new Array(NUM_SLICES).fill(0).map((_, i) => content.slice(SLICE_SIZE * i, SLICE_SIZE * (i + 1)))
+  try {
+    const content = await writeData(NUM_SLICES, SLICE_SIZE)
+    await readData(content, NUM_SLICES, SLICE_SIZE, READ_SIZE)
+    t.pass('all slices matched')
+  } catch (err) {
+    t.fail(err)
+  }
 
+  await cleanup()
+  t.end()
+})
+
+test('can read/write a large file', async t => {
+  const drive = hyperdrive(ram)
+  await mount(drive, './mnt')
+
+  const NUM_SLICES = 10000
+  const SLICE_SIZE = 4096
+  const READ_SIZE = Math.floor(4096 * 2.76)
+
+  try {
+    const content = await writeData(NUM_SLICES, SLICE_SIZE)
+    await readData(content, NUM_SLICES, SLICE_SIZE, READ_SIZE)
+    t.pass('all slices matched')
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup()
+  t.end()
+})
+
+test('can read/write a huge file', async t => {
+  const drive = hyperdrive(ram)
+  await mount(drive, './mnt')
+
+  const NUM_SLICES = 100000
+  const SLICE_SIZE = 4096
+  const READ_SIZE = Math.floor(4096 * 2.76)
+
+  try {
+    const content = await writeData(NUM_SLICES, SLICE_SIZE)
+    await readData(content, NUM_SLICES, SLICE_SIZE, READ_SIZE)
+    t.pass('all slices matched')
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup()
+  t.end()
+})
+
+async function writeData (numSlices, sliceSize) {
+  const content = Buffer.alloc(sliceSize * numSlices).fill('0123456789abcdefghijklmnopqrstuvwxyz')
+  let slices = new Array(numSlices).fill(0).map((_, i) => content.slice(sliceSize * i, sliceSize * (i + 1)))
   let fd = await open('./mnt/hello', 'w+')
   for (let slice of slices) {
     await write(fd, slice, 0)
   }
   await close(fd)
+  return content
+}
 
-  fd = await open('./mnt/hello', 'r')
+async function readData (content, numSlices, sliceSize, readSize) {
+  let fd = await open('./mnt/hello', 'r')
   let numReads = 0
-
-  try {
-    do {
-      const pos = numReads * READ_SIZE
-      const buf = Buffer.alloc(READ_SIZE)
-      let bytesRead = await read(fd, buf, 0, READ_SIZE, pos)
-      if (!buf.slice(0, bytesRead).equals(content.slice(pos, pos + READ_SIZE))) {
-        throw new Error(`Slices do not match at position: ${pos}`)
-      }
-    } while (++numReads * READ_SIZE < NUM_SLICES * SLICE_SIZE)
-    await close(fd)
-  } catch (err) {
-    t.fail(err)
-    await close(fd)
-    await cleanup()
-  }
-
-  t.pass('all slices matched')
-
-  await cleanup()
-  t.end()
-})
+  do {
+    const pos = numReads * readSize
+    const buf = Buffer.alloc(readSize)
+    let bytesRead = await read(fd, buf, 0, readSize, pos)
+    if (!buf.slice(0, bytesRead).equals(content.slice(pos, pos + readSize))) {
+      throw new Error(`Slices do not match at position: ${pos}`)
+    }
+  } while (++numReads * readSize < numSlices * sliceSize)
+  await close(fd)
+}
 
 function cleanup () {
   return new Promise((resolve, reject) => {
