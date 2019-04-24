@@ -97,7 +97,7 @@ function getHandlers (drive) {
 
   handlers.mkdir = function (path, mode, cb) {
     debug('mkdir', path)
-    drive.mkdir(path, mode, err => {
+    drive.mkdir(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
       if (err) return cb(-err.errno || fuse.EPERM)
       return cb(0)
     })
@@ -178,7 +178,10 @@ function getHandlers (drive) {
   return handlers
 }
 
-async function mount (drive, mnt, cb) {
+async function mount (drive, mnt, opts, cb) {
+  if (typeof opts === 'function') return mount(drive, mnt, null, opts)
+  opts = opts || {}
+
   const prom = ready()
   if (cb) {
     prom.catch(err => cb(err))
@@ -190,7 +193,8 @@ async function mount (drive, mnt, cb) {
   async function ready () {
     const handlers = getHandlers(drive)
 
-    // handlers.options = ['allow_other']
+    handlers.force = !!opts.force
+    handlers.displayFolder = !!opts.displayFolder
     handlers.options = []
     if (debug.enabled) {
       handlers.options.push('debug')
