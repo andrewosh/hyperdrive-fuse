@@ -30,7 +30,6 @@ function getHandlers (drive, mnt, opts = {}) {
     log('readdir', path)
     drive.readdir(path, (err, files) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
-      console.error('FILES:', files)
       return cb(0, files)
     })
   }
@@ -181,7 +180,6 @@ function getHandlers (drive, mnt, opts = {}) {
 
   handlers.symlink = function (target, linkname, cb) {
     log('symlink', target, linkname)
-    console.error('target:', target, 'linkname:', linkname)
     drive.symlink(target, linkname, err => {
       if (err) return cb(-err.errno || fuse.EPERM)
       return cb(0)
@@ -193,7 +191,6 @@ function getHandlers (drive, mnt, opts = {}) {
     drive.lstat(path, (err, st) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       const resolved = p.join(mnt, p.resolve('/', p.dirname(path), st.linkname))
-      console.error('RESOLVED:', resolved)
       return cb(0, resolved)
     })
   }
@@ -205,15 +202,10 @@ async function mount (drive, handlers, mnt, opts) {
   if (typeof handlers === 'string') return mount(drive, null, handlers, opts)
   opts = opts || {}
 
-  console.error('HANDLERS:', handlers, 'opts:', opts)
-
   return ready()
 
   function ready () {
-    console.error('handlers here:', handlers)
-    console.error('typeof handlers:', typeof handlers)
-    console.error('blah')
-    const handlers = handlers || getHandlers(drive, mnt, opts)
+    handlers = { ...handlers } || getHandlers(drive, mnt, opts)
 
     handlers.force = !!opts.force
     handlers.displayFolder = !!opts.displayFolder
