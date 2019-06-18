@@ -205,7 +205,7 @@ async function mount (drive, handlers, mnt, opts) {
   return ready()
 
   function ready () {
-    handlers = { ...handlers } || getHandlers(drive, mnt, opts)
+    handlers = handlers ? { ...handlers } : getHandlers(drive, mnt, opts)
 
     handlers.force = !!opts.force
     handlers.displayFolder = !!opts.displayFolder
