@@ -234,5 +234,6 @@ module.exports = {
   mount,
   unmount,
   configure: fuse.configure,
-  unconfigure: fuse.unconfigure
+  unconfigure: fuse.unconfigure,
+  isConfigured: fuse.isConfigured
 }
