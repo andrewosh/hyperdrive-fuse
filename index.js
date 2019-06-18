@@ -209,8 +209,7 @@ async function mount (drive, handlers, mnt, opts) {
 
   return ready()
 
-  async function ready () {
-    console.error('IN READY')
+  function ready () {
     console.error('handlers here:', handlers)
     console.error('typeof handlers:', typeof handlers)
     console.error('blah')
