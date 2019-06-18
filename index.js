@@ -1,3 +1,5 @@
+const p = require('path')
+const fs = require('fs')
 const os = require('os')
 
 const datEncoding = require('dat-encoding')
@@ -8,12 +10,13 @@ const { translate, linux } = fsConstants
 
 const debug = require('debug')('hyperdrive-fuse')
 
-function getHandlers (drive) {
-  const handlers = {}
+function getHandlers (drive, mnt, opts = {}) {
+  var handlers = {}
+  const log = opts.log || debug
 
   handlers.getattr = function (path, cb) {
-    debug('getattr', path)
-    drive.stat(path, (err, stat) => {
+    log('getattr', path)
+    drive.lstat(path, (err, stat) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       if (path === '/') {
         stat.uid = process.getuid()
@@ -24,7 +27,7 @@ function getHandlers (drive) {
   }
 
   handlers.readdir = function (path, cb) {
-    debug('readdir', path)
+    log('readdir', path)
     drive.readdir(path, (err, files) => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       return cb(0, files)
@@ -32,7 +35,7 @@ function getHandlers (drive) {
   }
 
   handlers.open = function (path, flags, cb) {
-    debug('open', path, flags)
+    log('open', path, flags)
 
     const platform = os.platform()
     if (platform !== 'linux') {
@@ -46,7 +49,7 @@ function getHandlers (drive) {
   }
 
   handlers.release = function (path, handle, cb) {
-    debug('release', path, handle)
+    log('release', path, handle)
     drive.close(handle, err => {
       if (err) return cb(-err.errno || fuse.EBADF)
       return cb(0)
@@ -59,7 +62,7 @@ function getHandlers (drive) {
   }
 
   handlers.read = function (path, handle, buf, len, offset, cb) {
-    debug('read', path, handle, len, offset)
+    log('read', path, handle, len, offset)
     drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
       if (err) return cb(-err.errno || fuse.EBADF)
       return cb(bytesRead)
@@ -67,7 +70,7 @@ function getHandlers (drive) {
   }
 
   handlers.write = function (path, handle, buf, len, offset, cb) {
-    debug('write', path, handle, len, offset)
+    log('write', path, handle, len, offset)
 
     // TODO: Duplicating the input buffer is a temporary patch for a race condition.
     // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
@@ -80,7 +83,7 @@ function getHandlers (drive) {
   }
 
   handlers.truncate = function (path, size, cb) {
-    debug('truncate', path, size)
+    log('truncate', path, size)
     drive.truncate(path, size, err => {
       if (err) return cb(-err.errno || fuse.EPERM)
       return cb(0)
@@ -88,7 +91,7 @@ function getHandlers (drive) {
   }
 
   handlers.unlink = function (path, cb) {
-    debug('unlink', path)
+    log('unlink', path)
     drive.unlink(path, err => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       return cb(0)
@@ -96,7 +99,7 @@ function getHandlers (drive) {
   }
 
   handlers.mkdir = function (path, mode, cb) {
-    debug('mkdir', path)
+    log('mkdir', path)
     drive.mkdir(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
       if (err) return cb(-err.errno || fuse.EPERM)
       return cb(0)
@@ -104,7 +107,7 @@ function getHandlers (drive) {
   }
 
   handlers.rmdir = function (path, cb) {
-    debug('rmdir', path)
+    log('rmdir', path)
     drive.rmdir(path, err => {
       if (err) return cb(-err.errno || fuse.ENOENT)
       return cb(0)
@@ -112,7 +115,7 @@ function getHandlers (drive) {
   }
 
   handlers.create = function (path, mode, cb) {
-    debug('create', path, mode)
+    log('create', path, mode)
     drive.create(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
       if (err) return cb(err)
       drive.open(path, 'w', (err, fd) => {
@@ -123,7 +126,7 @@ function getHandlers (drive) {
   }
 
   handlers.chown = function (path, uid, gid, cb) {
-    debug('chown', path, uid, gid)
+    log('chown', path, uid, gid)
     drive._update(path, { uid, gid }, err => {
       if (err) return cb(fuse.EPERM)
       return cb(0)
@@ -131,7 +134,7 @@ function getHandlers (drive) {
   }
 
   handlers.chmod = function (path, mode, cb) {
-    debug('chmod', path, mode)
+    log('chmod', path, mode)
     drive._update(path, { mode }, err => {
       if (err) return cb(fuse.EPERM)
       return cb(0)
@@ -139,7 +142,7 @@ function getHandlers (drive) {
   }
 
   handlers.utimens = function (path, actime, modtime, cb) {
-    debug('utimens', path, actime, modtime)
+    log('utimens', path, actime, modtime)
     drive._update(path, {
       atime: actime.getTime(),
       mtime: modtime.getTime()
@@ -150,12 +153,12 @@ function getHandlers (drive) {
   }
 
   handlers.getxattr = function (path, name, buffer, length, offset, cb) {
-    debug('getxattr')
+    log('getxattr')
     cb(0)
   }
 
   handlers.setxattr = function (path, name, buffer, length, offset, flags, cb) {
-    debug('setxattr')
+    log('setxattr')
     cb(0)
   }
 
@@ -175,34 +178,55 @@ function getHandlers (drive) {
     })
   }
 
+  handlers.symlink = function (target, linkname, cb) {
+    log('symlink', target, linkname)
+    drive.symlink(target, linkname, err => {
+      if (err) return cb(-err.errno || fuse.EPERM)
+      return cb(0)
+    })
+  }
+
+  handlers.readlink = function (path, cb) {
+    log('readlink', path)
+    drive.lstat(path, (err, st) => {
+      if (err) return cb(-err.errno || fuse.ENOENT)
+      const resolved = p.join(mnt, p.resolve('/', p.dirname(path), st.linkname))
+      return cb(0, resolved)
+    })
+  }
+
   return handlers
 }
 
-async function mount (drive, mnt, opts, cb) {
-  if (typeof opts === 'function') return mount(drive, mnt, null, opts)
+async function mount (drive, handlers, mnt, opts) {
+  if (typeof handlers === 'string') return mount(drive, null, handlers, opts)
   opts = opts || {}
 
-  const prom = ready()
-  if (cb) {
-    prom.catch(err => cb(err))
-    prom.then(obj => cb(null, obj))
-  }
+  return ready()
 
-  return prom
-
-  async function ready () {
-    const handlers = getHandlers(drive)
+  function ready () {
+    handlers = handlers ? { ...handlers } : getHandlers(drive, mnt, opts)
 
     handlers.force = !!opts.force
     handlers.displayFolder = !!opts.displayFolder
     handlers.options = []
-    if (debug.enabled) {
+    if (debug.enabled || opts.debug) {
       handlers.options.push('debug')
     }
 
     return new Promise((resolve, reject) => {
-      mkdirp(mnt, err => {
-        if (err) return reject(err)
+      fs.stat(mnt, (err, stat) => {
+        if (err && err.errno !== -2) return reject(err)
+        if (err) {
+          return mkdirp(mnt, err => {
+            if (err) return reject(err)
+            return mount()
+          })
+        }
+        return mount()
+      })
+
+      function mount () {
         drive.ready(err => {
           if (err) return reject(err)
           fuse.mount(mnt, handlers, err => {
@@ -211,7 +235,7 @@ async function mount (drive, mnt, opts, cb) {
             return resolve({ mnt, handlers, key: keyString, drive })
           })
         })
-      })
+      }
     })
   }
 }
@@ -233,6 +257,7 @@ function unmount (mnt, cb) {
 module.exports = {
   mount,
   unmount,
+  getHandlers,
   configure: fuse.configure,
   unconfigure: fuse.unconfigure,
   isConfigured: fuse.isConfigured
