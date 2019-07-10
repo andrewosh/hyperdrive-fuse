@@ -1,2 +1,2 @@
 # hyperdrive-fuse
-A FUSE flesystem for Hyperdrive
+A FUSE filesystem for Hyperdrive
