@@ -248,8 +248,8 @@ function unmount (mnt, cb) {
     })
   })
   if (cb) {
-    prom.then(() => cb(null))
-    prom.catch(err => cb(err))
+    prom.then(() => process.nextTick(cb, null))
+    prom.catch(cb)
   }
   return prom
 }
