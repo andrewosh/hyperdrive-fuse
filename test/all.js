@@ -1,13 +1,15 @@
 const fs = require('fs')
 const test = require('tape')
 const hyperdrive = require('hyperdrive')
+const fuse = require('fuse-native')
 const ram = require('random-access-memory')
 const rimraf = require('rimraf')
-const { mount, unmount } = require('..')
+const { mount, unmount, getHandlers } = require('..')
 
 test('can read/write a small file', async t => {
   const drive = hyperdrive(ram)
-  await mount(drive, './mnt')
+  const { destroy } = await mount(drive, './mnt')
+  process.once('SIGINT', () => cleanup(destroy))
 
   const NUM_SLICES = 100
   const SLICE_SIZE = 4096
@@ -21,13 +23,14 @@ test('can read/write a small file', async t => {
     t.fail(err)
   }
 
-  await cleanup()
+  await cleanup(destroy)
   t.end()
 })
 
 test('can read/write a large file', async t => {
   const drive = hyperdrive(ram)
-  await mount(drive, './mnt')
+  const { destroy } = await mount(drive, './mnt')
+  process.once('SIGINT', () => cleanup(destroy))
 
   const NUM_SLICES = 10000
   const SLICE_SIZE = 4096
@@ -41,13 +44,14 @@ test('can read/write a large file', async t => {
     t.fail(err)
   }
 
-  await cleanup()
+  await cleanup(destroy)
   t.end()
 })
 
 test('can read/write a huge file', async t => {
   const drive = hyperdrive(ram)
-  await mount(drive, './mnt')
+  const { destroy } = await mount(drive, './mnt')
+  process.once('SIGINT', () => cleanup(destroy))
 
   const NUM_SLICES = 100000
   const SLICE_SIZE = 4096
@@ -61,7 +65,32 @@ test('can read/write a huge file', async t => {
     t.fail(err)
   }
 
-  await cleanup()
+  await cleanup(destroy)
+  t.end()
+})
+
+test('a hanging get will be aborted after a timeout', async t => {
+  const drive = hyperdrive(ram)
+  const handlers = getHandlers(drive, './mnt')
+
+  // Create an artificial hang
+  handlers.chmod = (path, uid, gid, cb) => {}
+
+  const { destroy } = await mount(drive, handlers, './mnt')
+  process.once('SIGINT', () => cleanup(destroy))
+
+  await new Promise(resolve => {
+    fs.writeFile('./mnt/hello', 'goodbye', err => {
+      t.error(err, 'no error')
+      fs.chmod('./mnt/hello', 777, err => {
+        t.true(err)
+        t.same(err.errno, fuse.EIO)
+        return resolve()
+      })
+    })
+  })
+
+  await cleanup(destroy)
   t.end()
 })
 
@@ -90,9 +119,9 @@ async function readData (content, numSlices, sliceSize, readSize) {
   await close(fd)
 }
 
-function cleanup () {
+function cleanup (destroy) {
   return new Promise((resolve, reject) => {
-    unmount('./mnt', err => {
+    destroy(err => {
       if (err) return reject(err)
       rimraf('./mnt', err => {
         if (err) return reject(err)

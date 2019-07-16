@@ -229,10 +229,10 @@ async function mount (drive, handlers, mnt, opts) {
       function mount () {
         drive.ready(err => {
           if (err) return reject(err)
-          fuse.mount(mnt, handlers, err => {
+          fuse.mount(mnt, handlers, { safe: opts.safe !== false }, (err, destroy) => {
             if (err) return reject(err)
             const keyString = datEncoding.encode(drive.key)
-            return resolve({ mnt, handlers, key: keyString, drive })
+            return resolve({ mnt, handlers, key: keyString, drive, destroy })
           })
         })
       }
