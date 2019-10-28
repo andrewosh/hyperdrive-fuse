@@ -1,15 +1,20 @@
 const fs = require('fs')
 const test = require('tape')
 const hyperdrive = require('hyperdrive')
-const fuse = require('fuse-native')
 const ram = require('random-access-memory')
 const rimraf = require('rimraf')
-const { mount, unmount, getHandlers } = require('..')
+const Fuse = require('fuse-native')
+
+const { HyperdriveFuse } = require('..')
 
 test('can read/write a small file', async t => {
   const drive = hyperdrive(ram)
-  const { destroy } = await mount(drive, './mnt')
-  process.once('SIGINT', () => cleanup(destroy))
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
 
   const NUM_SLICES = 100
   const SLICE_SIZE = 4096
@@ -23,14 +28,19 @@ test('can read/write a small file', async t => {
     t.fail(err)
   }
 
-  await cleanup(destroy)
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
   t.end()
 })
 
 test('can read/write a large file', async t => {
   const drive = hyperdrive(ram)
-  const { destroy } = await mount(drive, './mnt')
-  process.once('SIGINT', () => cleanup(destroy))
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
 
   const NUM_SLICES = 10000
   const SLICE_SIZE = 4096
@@ -44,14 +54,19 @@ test('can read/write a large file', async t => {
     t.fail(err)
   }
 
-  await cleanup(destroy)
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
   t.end()
 })
 
 test('can read/write a huge file', async t => {
   const drive = hyperdrive(ram)
-  const { destroy } = await mount(drive, './mnt')
-  process.once('SIGINT', () => cleanup(destroy))
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
 
   const NUM_SLICES = 100000
   const SLICE_SIZE = 4096
@@ -65,11 +80,79 @@ test('can read/write a huge file', async t => {
     t.fail(err)
   }
 
-  await cleanup(destroy)
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
   t.end()
 })
 
-test('a hanging get will be aborted after a timeout', async t => {
+test('can list a directory', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.mkdir('./mnt/a', err => {
+        t.error(err, 'no error')
+        fs.writeFile('./mnt/a/1', '1', err => {
+          t.error(err, 'no error')
+          fs.writeFile('./mnt/a/2', '2', err => {
+            t.error(err, 'no error')
+            fs.readdir('./mnt/a', (err, list) => {
+              t.error(err, 'no error')
+              t.same(list, ['1', '2'])
+              return resolve()
+            })
+          })
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('can create and read from a symlink', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.writeFile('./mnt/a', 'hello', err => {
+        t.error(err, 'no error')
+        fs.symlink('a', './mnt/b', err => {
+          t.error(err, 'no error')
+          fs.readFile('./mnt/b', { encoding: 'utf-8' }, (err, content) => {
+            t.error(err, 'no error')
+            t.same(content, 'hello')
+            return resolve()
+          })
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test.skip('a hanging get will be aborted after a timeout', async t => {
   const drive = hyperdrive(ram)
   const handlers = getHandlers(drive, './mnt')
 
@@ -84,7 +167,7 @@ test('a hanging get will be aborted after a timeout', async t => {
       t.error(err, 'no error')
       fs.chmod('./mnt/hello', 777, err => {
         t.true(err)
-        t.same(err.errno, fuse.EIO)
+        t.same(err.errno, Fuse.EIO)
         return resolve()
       })
     })
@@ -119,14 +202,13 @@ async function readData (content, numSlices, sliceSize, readSize) {
   await close(fd)
 }
 
-function cleanup (destroy) {
+async function cleanup (fuse, exit) {
+  await fuse.unmount()
   return new Promise((resolve, reject) => {
-    destroy(err => {
+    rimraf('./mnt', err => {
       if (err) return reject(err)
-      rimraf('./mnt', err => {
-        if (err) return reject(err)
-        return resolve()
-      })
+      if (exit) return process.exit(0)
+      return resolve()
     })
   })
 }

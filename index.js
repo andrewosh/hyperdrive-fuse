@@ -4,261 +4,262 @@ const os = require('os')
 
 const datEncoding = require('dat-encoding')
 const mkdirp = require('mkdirp')
-const fuse = require('fuse-native')
 const fsConstants = require('filesystem-constants')
+const Fuse = require('fuse-native')
 const { translate, linux } = fsConstants
 
 const debug = require('debug')('hyperdrive-fuse')
 
-function getHandlers (drive, mnt, opts = {}) {
-  var handlers = {}
-  const log = opts.log || debug
+class HyperdriveFuse {
+  constructor (drive, mnt, opts = {}) {
+    this.drive = drive
+    this.mnt = p.resolve(mnt)
+    this.opts = opts
 
-  handlers.getattr = function (path, cb) {
-    log('getattr', path)
-    drive.lstat(path, (err, stat) => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      if (path === '/') {
-        stat.uid = process.getuid()
-        stat.gid = process.getgid()
-      }
-      return cb(0, stat)
-    })
+    // Set in mount
+    this.fuse = null
   }
 
-  handlers.readdir = function (path, cb) {
-    log('readdir', path)
-    drive.readdir(path, (err, files) => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      return cb(0, files)
-    })
-  }
+  getBaseHandlers () {
+    const self = this
+    const handlers = {}
+    const log = this.opts.log || debug
 
-  handlers.open = function (path, flags, cb) {
-    log('open', path, flags)
-
-    const platform = os.platform()
-    if (platform !== 'linux') {
-      flags = translate(fsConstants[platform], linux, flags)
+    handlers.getattr = function (path, cb) {
+      log('getattr', path)
+      self.drive.lstat(path, (err, stat) => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        if (path === '/') {
+          stat.uid = process.getuid()
+          stat.gid = process.getgid()
+        }
+        return cb(0, stat)
+      })
     }
 
-    drive.open(path, flags, (err, fd) => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      return cb(0, fd)
-    })
-  }
+    handlers.readdir = function (path, cb) {
+      log('readdir', path)
+      // TODO: pass in stat objects once readdirplus is enabled (FUSE 3.x)
+      self.drive.readdir(path, (err, files) => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        return cb(0, files)
+      })
+    }
 
-  handlers.release = function (path, handle, cb) {
-    log('release', path, handle)
-    drive.close(handle, err => {
-      if (err) return cb(-err.errno || fuse.EBADF)
-      return cb(0)
-    })
-  }
+    handlers.open = function (path, flags, cb) {
+      log('open', path, flags)
 
-  handlers.releasedir = function (path, handle, cb) {
-    // TODO: What to do here?
-    return cb(0)
-  }
+      const platform = os.platform()
+      if (platform !== 'linux') {
+        flags = translate(fsConstants[platform], linux, flags)
+      }
 
-  handlers.read = function (path, handle, buf, len, offset, cb) {
-    log('read', path, handle, len, offset)
-    drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
-      if (err) return cb(-err.errno || fuse.EBADF)
-      return cb(bytesRead)
-    })
-  }
-
-  handlers.write = function (path, handle, buf, len, offset, cb) {
-    log('write', path, handle, len, offset)
-
-    // TODO: Duplicating the input buffer is a temporary patch for a race condition.
-    // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
-    buf = Buffer.from(buf)
-
-    drive.write(handle, buf, 0, len, (err, bytesWritten) => {
-      if (err) return cb(-err.errno || fuse.EBADF)
-      return cb(bytesWritten)
-    })
-  }
-
-  handlers.truncate = function (path, size, cb) {
-    log('truncate', path, size)
-    drive.truncate(path, size, err => {
-      if (err) return cb(-err.errno || fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.unlink = function (path, cb) {
-    log('unlink', path)
-    drive.unlink(path, err => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      return cb(0)
-    })
-  }
-
-  handlers.mkdir = function (path, mode, cb) {
-    log('mkdir', path)
-    drive.mkdir(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
-      if (err) return cb(-err.errno || fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.rmdir = function (path, cb) {
-    log('rmdir', path)
-    drive.rmdir(path, err => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      return cb(0)
-    })
-  }
-
-  handlers.create = function (path, mode, cb) {
-    log('create', path, mode)
-    drive.create(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
-      if (err) return cb(err)
-      drive.open(path, 'w', (err, fd) => {
-        if (err) return cb(-err.errno || fuse.ENOENT)
+      self.drive.open(path, flags, (err, fd) => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        console.error('OPENED FD:', fd, 'WITH FLAGS:', flags)
         return cb(0, fd)
       })
-    })
-  }
-
-  handlers.chown = function (path, uid, gid, cb) {
-    log('chown', path, uid, gid)
-    drive._update(path, { uid, gid }, err => {
-      if (err) return cb(fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.chmod = function (path, mode, cb) {
-    log('chmod', path, mode)
-    drive._update(path, { mode }, err => {
-      if (err) return cb(fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.utimens = function (path, actime, modtime, cb) {
-    log('utimens', path, actime, modtime)
-    drive._update(path, {
-      atime: actime.getTime(),
-      mtime: modtime.getTime()
-    }, err => {
-      if (err) return cb(fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.getxattr = function (path, name, buffer, length, offset, cb) {
-    log('getxattr')
-    cb(0)
-  }
-
-  handlers.setxattr = function (path, name, buffer, length, offset, flags, cb) {
-    log('setxattr')
-    cb(0)
-  }
-
-  handlers.statfs = function (path, cb) {
-    cb(0, {
-      bsize: 1000000,
-      frsize: 1000000,
-      blocks: 1000000,
-      bfree: 1000000,
-      bavail: 1000000,
-      files: 1000000,
-      ffree: 1000000,
-      favail: 1000000,
-      fsid: 1000000,
-      flag: 1000000,
-      namemax: 1000000
-    })
-  }
-
-  handlers.symlink = function (target, linkname, cb) {
-    log('symlink', target, linkname)
-    drive.symlink(target, linkname, err => {
-      if (err) return cb(-err.errno || fuse.EPERM)
-      return cb(0)
-    })
-  }
-
-  handlers.readlink = function (path, cb) {
-    log('readlink', path)
-    drive.lstat(path, (err, st) => {
-      if (err) return cb(-err.errno || fuse.ENOENT)
-      const resolved = p.join(mnt, p.resolve('/', p.dirname(path), st.linkname))
-      return cb(0, resolved)
-    })
-  }
-
-  return handlers
-}
-
-async function mount (drive, handlers, mnt, opts) {
-  if (typeof handlers === 'string') return mount(drive, null, handlers, opts)
-  opts = opts || {}
-
-  return ready()
-
-  function ready () {
-    handlers = handlers ? { ...handlers } : getHandlers(drive, mnt, opts)
-
-    handlers.force = !!opts.force
-    handlers.displayFolder = !!opts.displayFolder
-    handlers.options = []
-    if (debug.enabled || opts.debug) {
-      handlers.options.push('debug')
     }
 
+    handlers.release = function (path, handle, cb) {
+      log('release', path, handle)
+      self.drive.close(handle, err => {
+        if (err) return cb(-err.errno || Fuse.EBADF)
+        return cb(0)
+      })
+    }
+
+    handlers.releasedir = function (path, handle, cb) {
+      // TODO: What to do here?
+      return cb(0)
+    }
+
+    handlers.read = function (path, handle, buf, len, offset, cb) {
+      log('read', path, handle, len, offset)
+      self.drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
+        if (err) return cb(-err.errno || Fuse.EBADF)
+        return cb(bytesRead)
+      })
+    }
+
+    handlers.write = function (path, handle, buf, len, offset, cb) {
+      log('write', path, handle, len, offset)
+
+      // TODO: Duplicating the input buffer is a temporary patch for a race condition.
+      // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
+      buf = Buffer.from(buf)
+
+      console.error('HANDLE IS:', handle)
+      self.drive.write(handle, buf, 0, len, (err, bytesWritten) => {
+        console.error('ERROR IN WRITE:', err)
+        if (err) return cb(-err.errno || Fuse.EBADF)
+        return cb(bytesWritten)
+      })
+    }
+
+    handlers.truncate = function (path, size, cb) {
+      log('truncate', path, size)
+      self.drive.truncate(path, size, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.unlink = function (path, cb) {
+      log('unlink', path)
+      self.drive.unlink(path, err => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        return cb(0)
+      })
+    }
+
+    handlers.mkdir = function (path, mode, cb) {
+      log('mkdir', path)
+      self.drive.mkdir(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.rmdir = function (path, cb) {
+      log('rmdir', path)
+      self.drive.rmdir(path, err => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        return cb(0)
+      })
+    }
+
+    handlers.create = function (path, mode, cb) {
+      log('create', path, mode)
+      self.drive.create(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
+        if (err) return cb(err)
+        self.drive.open(path, 'w', (err, fd) => {
+          if (err) return cb(-err.errno || Fuse.ENOENT)
+          return cb(0, fd)
+        })
+      })
+    }
+
+    handlers.chown = function (path, uid, gid, cb) {
+      log('chown', path, uid, gid)
+      self.drive._update(path, { uid, gid }, err => {
+        if (err) return cb(Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.chmod = function (path, mode, cb) {
+      log('chmod', path, mode)
+      self.drive._update(path, { mode }, err => {
+        if (err) return cb(Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.utimens = function (path, atime, mtime, cb) {
+      console.error('actime:', atime, 'modtime:', mtime)
+      log('utimens', path, atime, mtime)
+      self.drive._update(path, { atime, mtime }, err => {
+        if (err) return cb(Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.symlink = function (target, linkname, cb) {
+      log('symlink', target, linkname)
+      self.drive.symlink(target, linkname, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.readlink = function (path, cb) {
+      log('readlink', path)
+      self.drive.lstat(path, (err, st) => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        const resolved = p.join(self.mnt, p.resolve('/', p.dirname(path), st.linkname))
+        return cb(0, resolved)
+      })
+    }
+
+    handlers.statfs = function (path, cb) {
+      cb(0, {
+        bsize: 1000000,
+        frsize: 1000000,
+        blocks: 1000000,
+        bfree: 1000000,
+        bavail: 1000000,
+        files: 1000000,
+        ffree: 1000000,
+        favail: 1000000,
+        fsid: 1000000,
+        flag: 1000000,
+        namemax: 1000000
+      })
+    }
+
+    return handlers
+  }
+
+  async mount (handlers) {
+    if (this.fuse) throw new Error('Cannot remount the same HyperdriveFuse instance.')
+
+    const self = this
+    handlers = handlers ? { ...handlers } : this.getBaseHandlers()
+
+    const mountOpts = { ...this.opts }
+    mountOpts.safe = this.opts.safe !== false
+    mountOpts.debug = this.opts.debug || debug.enabled
+
+    const fuse = new Fuse(this.mnt, handlers, mountOpts)
+
     return new Promise((resolve, reject) => {
-      fs.stat(mnt, (err, stat) => {
+      return fs.stat(this.mnt, (err, stat) => {
         if (err && err.errno !== -2) return reject(err)
         if (err) {
-          return mkdirp(mnt, err => {
+          return mkdirp(this.mnt, err => {
             if (err) return reject(err)
-            return mount()
+            return mount(resolve, reject)
           })
         }
-        return mount()
+        return mount(resolve, reject)
       })
+    })
 
-      function mount () {
-        drive.ready(err => {
+    function mount (resolve, reject) {
+      return self.drive.ready(err => {
+        if (err) return reject(err)
+        return fuse.mount(err => {
           if (err) return reject(err)
-          fuse.mount(mnt, handlers, { safe: opts.safe !== false }, (err, destroy) => {
-            if (err) return reject(err)
-            const keyString = datEncoding.encode(drive.key)
-            return resolve({ mnt, handlers, key: keyString, drive, destroy })
+          const keyString = datEncoding.encode(self.drive.key)
+          self.fuse = fuse
+          return resolve({
+            handlers,
+            mnt: self.mnt,
+            key: keyString,
+            drive: self.drive
           })
         })
-      }
-    })
+      })
+    }
   }
-}
 
-function unmount (mnt, cb) {
-  const prom = new Promise((resolve, reject) => {
-    fuse.unmount(mnt, err => {
-      if (err) return reject(err)
-      return resolve(err)
+  unmount () {
+    if (!this.fuse) return null
+    return new Promise((resolve, reject) => {
+      return this.fuse.unmount(err => {
+        if (err) return reject(err)
+        return resolve(err)
+      })
     })
-  })
-  if (cb) {
-    prom.then(() => process.nextTick(cb, null))
-    prom.catch(cb)
   }
-  return prom
 }
 
 module.exports = {
-  mount,
-  unmount,
-  getHandlers,
-  configure: fuse.configure,
-  unconfigure: fuse.unconfigure,
-  isConfigured: fuse.isConfigured
+  HyperdriveFuse,
+  configure: Fuse.configure,
+  unconfigure: Fuse.unconfigure,
+  isConfigured: Fuse.isConfigured,
+  beforeMount: Fuse.beforeMount,
+  beforeUnmount: Fuse.beforeUnmount
 }
