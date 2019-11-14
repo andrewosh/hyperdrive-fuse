@@ -56,7 +56,6 @@ class HyperdriveFuse {
 
       self.drive.open(path, flags, (err, fd) => {
         if (err) return cb(-err.errno || Fuse.ENOENT)
-        console.error('OPENED FD:', fd, 'WITH FLAGS:', flags)
         return cb(0, fd)
       })
     }
@@ -89,9 +88,7 @@ class HyperdriveFuse {
       // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
       buf = Buffer.from(buf)
 
-      console.error('HANDLE IS:', handle)
       self.drive.write(handle, buf, 0, len, (err, bytesWritten) => {
-        console.error('ERROR IN WRITE:', err)
         if (err) return cb(-err.errno || Fuse.EBADF)
         return cb(bytesWritten)
       })
@@ -157,7 +154,6 @@ class HyperdriveFuse {
     }
 
     handlers.utimens = function (path, atime, mtime, cb) {
-      console.error('actime:', atime, 'modtime:', mtime)
       log('utimens', path, atime, mtime)
       self.drive._update(path, { atime, mtime }, err => {
         if (err) return cb(Fuse.EPERM)
