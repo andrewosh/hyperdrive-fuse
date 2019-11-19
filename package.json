@@ -34,6 +34,6 @@
   "dependencies": {
     "dat-encoding": "^5.0.1",
     "filesystem-constants": "^1.0.0",
-    "fuse-native": "git+https://github.com/fuse-friends/fuse-native#reimpl"
+    "fuse-native": "git+https://github.com/fuse-friends/fuse-native"
   }
 }
