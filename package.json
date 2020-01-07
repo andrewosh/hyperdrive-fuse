@@ -24,8 +24,8 @@
   },
   "homepage": "https://github.com/andrewosh/hyperdrive-fuse#readme",
   "devDependencies": {
-    "corestore": "^4.0.0",
-    "hyperdrive": "^10.4.4",
+    "corestore": "^5.0.0",
+    "hyperdrive": "beta",
     "random-access-memory": "^3.1.1",
     "rimraf": "^2.6.3",
     "standard": "^12.0.1",
@@ -34,6 +34,7 @@
   "dependencies": {
     "dat-encoding": "^5.0.1",
     "filesystem-constants": "^1.0.0",
-    "fuse-native": "2.0.2"
+    "fs-xattr": "^0.3.0",
+    "fuse-native": "git+https://github.com/fuse-friends/fuse-native"
   }
 }

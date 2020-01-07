@@ -3,6 +3,8 @@ const test = require('tape')
 const hyperdrive = require('hyperdrive')
 const ram = require('random-access-memory')
 const rimraf = require('rimraf')
+const xattr = require('fs-xattr')
+const { exec } = require('child_process')
 const Fuse = require('fuse-native')
 
 const { HyperdriveFuse } = require('..')
@@ -174,6 +176,32 @@ test.skip('a hanging get will be aborted after a timeout', async t => {
   })
 
   await cleanup(destroy)
+  t.end()
+})
+
+test.only('can write a file with xattrs', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  await fs.promises.writeFile('test.txt', 'hello')
+  await xattr.set('test.txt', 'key', 'value')
+  await new Promise((resolve, reject) => {
+    exec('cp test.txt ./mnt/hello.txt', err => {
+      if (err) return reject(err)
+      return resolve()
+    })
+  })
+  const contents = await fs.promises.readFile('./mnt/hello.txt', { encoding: 'utf8' })
+  t.same(contents, 'hello')
+
+  // await fs.promises.unlink('test.txt')
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
   t.end()
 })
 
