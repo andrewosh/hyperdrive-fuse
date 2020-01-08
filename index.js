@@ -10,6 +10,8 @@ const { translate, linux } = fsConstants
 
 const debug = require('debug')('hyperdrive-fuse')
 
+const platform = os.platform()
+
 class HyperdriveFuse {
   constructor (drive, mnt, opts = {}) {
     this.drive = drive
@@ -49,7 +51,6 @@ class HyperdriveFuse {
     handlers.open = function (path, flags, cb) {
       log('open', path, flags)
 
-      const platform = os.platform()
       if (platform !== 'linux') {
         flags = translate(fsConstants[platform], linux, flags)
       }
@@ -192,6 +193,23 @@ class HyperdriveFuse {
         flag: 1000000,
         namemax: 1000000
       })
+    }
+
+    // TODO: Think of better ways to persist kv-metadata from FUSE (probably need to deny system-specific keys on OSX).
+    // This is only necessary on OSX
+    if (platform === 'darwin') {
+      handlers.setxattr = function (path, name, buffer, length, offset, flags, cb) {
+        cb(0)
+      }
+      handlers.getxattr = function (path, name, buffer, length, offset, cb) {
+        cb(0)
+      }
+      handlers.listxattr = function (path, buffer, length, cb) {
+        cb(0)
+      }
+      handlers.removexattr = function (path, name, cb) {
+        cb(0)
+      }
     }
 
     return handlers
