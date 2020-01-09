@@ -198,14 +198,14 @@ class HyperdriveFuse {
     // TODO: Think of better ways to persist kv-metadata from FUSE (probably need to deny system-specific keys on OSX).
     // This is only necessary on OSX
     if (platform === 'darwin') {
-      handlers.setxattr = function (path, name, buffer, length, offset, flags, cb) {
+      handlers.setxattr = function (path, name, buffer, position, flags, cb) {
         cb(0)
       }
-      handlers.getxattr = function (path, name, buffer, length, offset, cb) {
+      handlers.getxattr = function (path, name, position, cb) {
         cb(0)
       }
-      handlers.listxattr = function (path, buffer, length, cb) {
-        cb(0)
+      handlers.listxattr = function (path, cb) {
+        cb(0, [])
       }
       handlers.removexattr = function (path, name, cb) {
         cb(0)
