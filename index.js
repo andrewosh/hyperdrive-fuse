@@ -89,7 +89,7 @@ class HyperdriveFuse {
       // (Fuse overwrites the input before the data is flushed to storage in hypercore.)
       buf = Buffer.from(buf)
 
-      self.drive.write(handle, buf, 0, len, (err, bytesWritten) => {
+      self.drive.write(handle, buf, 0, len, offset, (err, bytesWritten) => {
         if (err) return cb(-err.errno || Fuse.EBADF)
         return cb(bytesWritten)
       })
