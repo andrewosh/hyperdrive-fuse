@@ -1,6 +1,6 @@
 {
   "name": "hyperdrive-fuse",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "FUSE bindings for Hyperdrive",
   "main": "index.js",
   "directories": {
