@@ -221,7 +221,10 @@ class HyperdriveFuse {
     const self = this
     handlers = handlers ? { ...handlers } : this.getBaseHandlers()
 
-    const mountOpts = { ...this.opts }
+    const mountOpts = {
+      ...this.opts,
+      autoCache: true
+    }
     mountOpts.safe = this.opts.safe !== false
     mountOpts.debug = this.opts.debug || debug.enabled
 
