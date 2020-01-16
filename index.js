@@ -195,21 +195,39 @@ class HyperdriveFuse {
       })
     }
 
-    // TODO: Think of better ways to persist kv-metadata from FUSE (probably need to deny system-specific keys on OSX).
-    // This is only necessary on OSX
-    if (platform === 'darwin') {
-      handlers.setxattr = function (path, name, buffer, position, flags, cb) {
-        cb(0)
-      }
-      handlers.getxattr = function (path, name, position, cb) {
-        cb(0)
-      }
-      handlers.listxattr = function (path, cb) {
-        cb(0, [])
-      }
-      handlers.removexattr = function (path, name, cb) {
-        cb(0)
-      }
+    handlers.setxattr = function (path, name, buffer, position, flags, cb) {
+      log('setxattr', path, name)
+      if (platform === 'darwin' && path.startsWith('com.apple')) return cb(0)
+      self.drive.setMetadata(path, name, buffer, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
+    handlers.getxattr = function (path, name, position, cb) {
+      log('getxattr', path, name)
+      self.drive.stat(path, (err, stat) => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        if (!stat.metadata) return cb(0, null)
+        return cb(0, stat.metadata[name])
+      })
+    }
+
+    handlers.listxattr = function (path, cb) {
+      log('listxattr', path)
+      self.drive.stat(path, (err, stat) => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        if (!stat.metadata) return cb(0, [])
+        return cb(0, Object.keys(stat.metadata))
+      })
+    }
+
+    handlers.removexattr = function (path, name, cb) {
+      log('removexattr', path, name)
+      self.drive.removeMetadata(path, name, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
     }
 
     return handlers

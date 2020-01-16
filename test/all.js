@@ -3,6 +3,7 @@ const test = require('tape')
 const hyperdrive = require('hyperdrive')
 const ram = require('random-access-memory')
 const rimraf = require('rimraf')
+const xattr = require('fs-xattr')
 const Fuse = require('fuse-native')
 
 const { HyperdriveFuse } = require('..')
@@ -143,6 +144,31 @@ test('can create and read from a symlink', async t => {
         })
       })
     })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('can get/set/list xattrs', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await fs.promises.writeFile('./mnt/a', 'hello')
+    await xattr.set('./mnt/a', 'test', 'hello world')
+    t.same(await xattr.get('./mnt/a', 'test'), Buffer.from('hello world'))
+    let list = await xattr.list('./mnt/a')
+    t.same(list.length, 1)
+    t.same(list[0], 'test')
   } catch (err) {
     t.fail(err)
   }
