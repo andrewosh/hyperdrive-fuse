@@ -103,6 +103,14 @@ class HyperdriveFuse {
       })
     }
 
+    handlers.ftruncate = function (path, fd, size, cb) {
+      log('ftruncate', path, fd, size)
+      self.drive.ftruncate(fd, size, err => {
+        if (err) return cb(-err.errno || Fuse.EPERM)
+        return cb(0)
+      })
+    }
+
     handlers.unlink = function (path, cb) {
       log('unlink', path)
       self.drive.unlink(path, err => {
