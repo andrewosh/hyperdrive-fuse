@@ -138,7 +138,7 @@ class HyperdriveFuse {
     handlers.create = function (path, mode, cb) {
       log('create', path, mode)
       self.drive.create(path, { mode, uid: process.getuid(), gid: process.getgid() }, err => {
-        if (err) return cb(err)
+        if (err) return cb(-err.errno || Fuse.ENOENT)
         self.drive.open(path, 'w', (err, fd) => {
           if (err) return cb(-err.errno || Fuse.ENOENT)
           return cb(0, fd)
