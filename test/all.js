@@ -189,10 +189,12 @@ test('uid/gid are normalized on read', async t => {
 
   try {
     await new Promise(resolve => {
-      fs.writeFile('./mnt/a', 'hello', err => {
+      drive.writeFile('a', 'hello', { uid: 0, gid: 0 }, err => {
         t.error(err, 'no error')
-        fs.chown('./mnt/a', 0, 0, err => {
+        drive.stat('a', (err, stat) => {
           t.error(err, 'no error')
+          t.same(stat.uid, 0)
+          t.same(stat.gid, 0)
           fs.stat('./mnt/a', (err, stat) => {
             t.error(err, 'no error')
             t.same(stat.uid, process.getuid())
