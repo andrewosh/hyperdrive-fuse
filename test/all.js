@@ -178,6 +178,39 @@ test('can get/set/list xattrs', async t => {
   t.end()
 })
 
+test('uid/gid are normalized on read', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.writeFile('./mnt/a', 'hello', err => {
+        t.error(err, 'no error')
+        fs.chown('./mnt/a', 0, 0, err => {
+          t.error(err, 'no error')
+          fs.stat('./mnt/a', (err, stat) => {
+            t.error(err, 'no error')
+            t.same(stat.uid, process.getuid())
+            t.same(stat.gid, process.getgid())
+            return resolve()
+          })
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
 test.skip('a hanging get will be aborted after a timeout', async t => {
   const drive = hyperdrive(ram)
   const handlers = getHandlers(drive, './mnt')
