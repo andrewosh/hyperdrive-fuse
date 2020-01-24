@@ -249,12 +249,12 @@ class HyperdriveFuse {
 
     const mountOpts = {
       ...this.opts,
-      autoCache: true,
       uid: process.getuid(),
-      gid: process.getgid()
+      gid: process.getgid(),
+      debug: this.opts.debug || debug.enabled,
+      autoCache: true,
+      force: true
     }
-    mountOpts.safe = this.opts.safe !== false
-    mountOpts.debug = this.opts.debug || debug.enabled
 
     const fuse = new Fuse(this.mnt, handlers, mountOpts)
 
