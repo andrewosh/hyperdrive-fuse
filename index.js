@@ -248,30 +248,17 @@ class HyperdriveFuse {
     handlers = handlers ? { ...handlers } : this.getBaseHandlers()
 
     const mountOpts = {
-      ...this.opts,
       uid: process.getuid(),
       gid: process.getgid(),
       autoCache: true,
-      force: true
+      force: true,
+      mkdir: true
     }
     mountOpts.debug = this.opts.debug || debug.enabled
 
     const fuse = new Fuse(this.mnt, handlers, mountOpts)
 
     return new Promise((resolve, reject) => {
-      return fs.stat(this.mnt, (err, stat) => {
-        if (err && err.errno !== -2) return reject(err)
-        if (err) {
-          return mkdirp(this.mnt, err => {
-            if (err) return reject(err)
-            return mount(resolve, reject)
-          })
-        }
-        return mount(resolve, reject)
-      })
-    })
-
-    function mount (resolve, reject) {
       return self.drive.ready(err => {
         if (err) return reject(err)
         return fuse.mount(err => {
@@ -286,7 +273,7 @@ class HyperdriveFuse {
           })
         })
       })
-    }
+    })
   }
 
   unmount () {
