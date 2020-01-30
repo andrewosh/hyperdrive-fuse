@@ -31,10 +31,8 @@ class HyperdriveFuse {
       log('getattr', path)
       self.drive.lstat(path, (err, stat) => {
         if (err) return cb(-err.errno || Fuse.ENOENT)
-        if (path === '/') {
-          stat.uid = process.getuid()
-          stat.gid = process.getgid()
-        }
+        stat.uid = process.getuid()
+        stat.gid = process.getgid()
         return cb(0, stat)
       })
     }
@@ -182,7 +180,8 @@ class HyperdriveFuse {
       log('readlink', path)
       self.drive.lstat(path, (err, st) => {
         if (err) return cb(-err.errno || Fuse.ENOENT)
-        const resolved = p.join(self.mnt, p.resolve('/', p.dirname(path), st.linkname))
+        // Always translate absolute symlinks to be relative to the mount root.
+        const resolved = p.isAbsolute(st.linkname) ? p.join(self.mnt, st.linkname) : st.linkname
         return cb(0, resolved)
       })
     }
@@ -250,6 +249,7 @@ class HyperdriveFuse {
     const mountOpts = {
       uid: process.getuid(),
       gid: process.getgid(),
+      displayFolder: true,
       autoCache: true,
       force: true,
       mkdir: true
