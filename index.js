@@ -252,9 +252,9 @@ class HyperdriveFuse {
       displayFolder: true,
       autoCache: true,
       force: true,
-      mkdir: true
+      mkdir: true,
+      debug: debug.enabled
     }
-    mountOpts.debug = this.opts.debug || debug.enabled
 
     const fuse = new Fuse(this.mnt, handlers, mountOpts)
 
