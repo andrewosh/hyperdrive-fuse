@@ -74,8 +74,10 @@ class HyperdriveFuse {
 
     handlers.read = function (path, handle, buf, len, offset, cb) {
       log('read', path, handle, len, offset)
-      self.drive.read(handle, buf, 0, len, offset, (err, bytesRead) => {
+      const proxy = Buffer.from(buf)
+      self.drive.read(handle, proxy, 0, len, offset, (err, bytesRead) => {
         if (err) return cb(-err.errno || Fuse.EBADF)
+        proxy.copy(buf, 0, 0, len)
         return cb(bytesRead)
       })
     }
@@ -205,7 +207,7 @@ class HyperdriveFuse {
     handlers.setxattr = function (path, name, buffer, position, flags, cb) {
       log('setxattr', path, name)
       if (platform === 'darwin' && path.startsWith('com.apple')) return cb(0)
-      self.drive.setMetadata(path, name, buffer, err => {
+      self.drive.setMetadata(path, name, Buffer.from(buffer), err => {
         if (err) return cb(-err.errno || Fuse.EPERM)
         return cb(0)
       })
@@ -253,7 +255,11 @@ class HyperdriveFuse {
       autoCache: true,
       force: true,
       mkdir: true,
-      debug: debug.enabled
+      debug: debug.enabled,
+      timeout: {
+        write: false,
+        default: 15 * 1000
+      }
     }
 
     const fuse = new Fuse(this.mnt, handlers, mountOpts)
