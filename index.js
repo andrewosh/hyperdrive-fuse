@@ -183,7 +183,9 @@ class HyperdriveFuse {
       self.drive.lstat(path, (err, st) => {
         if (err) return cb(-err.errno || Fuse.ENOENT)
         // Always translate absolute symlinks to be relative to the mount root.
-        const resolved = p.isAbsolute(st.linkname) ? p.join(self.mnt, st.linkname) : st.linkname
+        // Since hyperdrive supports absolute paths that aren't prefixed by '/', translate them first.
+        const linkname = !p.isAbsolute(st.linkname) && !st.linkname.startsWith('.') ? '/' + st.linkname : st.linkname
+        const resolved = p.isAbsolute(st.linkname) ? p.join(self.mnt, linkname) : p.join(self.mnt, p.resolve(path, linkname))
         return cb(0, resolved)
       })
     }

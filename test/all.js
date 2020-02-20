@@ -1,3 +1,4 @@
+const p = require('path')
 const fs = require('fs')
 const test = require('tape')
 const hyperdrive = require('hyperdrive')
@@ -209,6 +210,72 @@ test('uid/gid are normalized on read', async t => {
   }
 
   await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('a relative symlink will not read files outside the sandbox', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fs.promises.writeFile('./test.txt', 'Hello world!')
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      drive.symlink('../test.txt', 'test', err => {
+        t.error(err, 'no error')
+        return resolve()
+      })
+    })
+    try {
+      const contents = await fs.promises.readFile('./mnt/test', { encoding: 'utf8' })
+      t.false(contents)
+    } catch (err) {
+      t.true(err)
+    }
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  await fs.promises.unlink('./test.txt')
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('an absolute symlink will not read files outside the sandbox', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fs.promises.writeFile('./test.txt', 'Hello world!')
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      const target = p.resolve('./mnt', '../test.txt')
+      drive.symlink(target, 'test', err => {
+        t.error(err, 'no error')
+        return resolve()
+      })
+    })
+    try {
+      const contents = await fs.promises.readFile('./mnt/test', { encoding: 'utf8' })
+      t.false(contents)
+    } catch (err) {
+      t.true(err)
+      t.same(err.errno, -2)
+    }
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  await fs.promises.unlink('./test.txt')
   process.removeListener('SIGINT', onint)
   t.end()
 })
