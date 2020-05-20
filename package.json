@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/andrewosh/hyperdrive-fuse#readme",
   "devDependencies": {
-    "corestore": "^4.0.0",
+    "corestore": "^5.3.2",
     "fs-xattr": "^0.3.0",
     "hyperdrive": "^10.4.4",
     "random-access-memory": "^3.1.1",
