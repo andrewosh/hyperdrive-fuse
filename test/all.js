@@ -280,6 +280,37 @@ test('an absolute symlink will not read files outside the sandbox', async t => {
   t.end()
 })
 
+test('cannot open a writable file descriptor on a non-writable drive', async t => {
+  const drive = hyperdrive(ram)
+  const clone = await new Promise(resolve => {
+    drive.writeFile('hello', 'world', () => {
+      const clone = hyperdrive(ram, drive.key)
+      clone.ready(() => {
+        const s1 = clone.replicate(true, { live: true })
+        const s2 = drive.replicate(false, { live: true })
+        s1.pipe(s2).pipe(s1)
+        return resolve(clone)
+      })
+    })
+  })
+
+  const fuse = new HyperdriveFuse(clone, './mnt')
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+  await fuse.mount()
+
+  try {
+    await fs.promises.open('./mnt/hello', 'w+')
+    t.fail('open did not error')
+  } catch (err) {
+    t.true(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
 test.skip('a hanging get will be aborted after a timeout', async t => {
   const drive = hyperdrive(ram)
   const handlers = getHandlers(drive, './mnt')
