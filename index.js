@@ -196,7 +196,7 @@ class HyperdriveFuse {
       // TODO: Provide better renaming support once new trie rolls out
       self.drive.stat(oldpath, (err,stat) =>{
         if(stat.isFile()){
-          self.drive.copy(oldpath,newpath, (err, stat) => {
+          self.drive.copy(oldpath,newpath, err => {
           if (err) return cb(-err.errno || Fuse.ENOENT)
             self.drive.unlink(oldpath, err => {
               if (err) return cb(-err.errno || Fuse.ENOENT)
