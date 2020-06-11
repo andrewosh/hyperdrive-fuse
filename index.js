@@ -194,15 +194,19 @@ class HyperdriveFuse {
       log('rename', oldpath, newpath)
       // This implementation only supports file rename, directories isn't really feasible for the moment
       // TODO: Provide better renaming support once new trie rolls out
-      self.drive.stat(oldpath, (err,stat) =>{
-        if(stat.isFile()){
-          self.drive.copy(oldpath,newpath, err => {
-          if (err) return cb(-err.errno || Fuse.ENOENT)
+      self.drive.stat(oldpath, (err, stat) => {
+        if (err) return cb(-err.errno || Fuse.ENOENT)
+        if (stat.isFile()) {
+          self.drive.copy(oldpath, newpath, err => {
+            if (err) return cb(-err.errno || Fuse.ENOENT)
             self.drive.unlink(oldpath, err => {
               if (err) return cb(-err.errno || Fuse.ENOENT)
               return cb(0)
             })
           })
+        }
+        else {
+          return cb(Fuse.EISDIR)
         }
       })
     }

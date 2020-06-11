@@ -400,6 +400,35 @@ test('can rename a file without creating duplicates', async t => {
   t.end()
 })
 
+test('cannot rename a directory', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.mkdir('./mnt/foo', err => {
+        t.error(err, 'no error')
+        fs.rename('./mnt/foo','./mnt/bar', err => {
+          t.true(err)
+          t.same(err.errno,Fuse.EISDIR)
+          return resolve()
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
 async function writeData (numSlices, sliceSize) {
   const content = Buffer.alloc(sliceSize * numSlices).fill('0123456789abcdefghijklmnopqrstuvwxyz')
   let slices = new Array(numSlices).fill(0).map((_, i) => content.slice(sliceSize * i, sliceSize * (i + 1)))
