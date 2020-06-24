@@ -336,6 +336,99 @@ test.skip('a hanging get will be aborted after a timeout', async t => {
   t.end()
 })
 
+test('can rename and read a file', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.writeFile('./mnt/foo', 'hello', err => {
+        t.error(err, 'no error')
+        fs.rename('./mnt/foo','./mnt/bar', err => {
+          t.error(err, 'no error')
+          fs.readFile('./mnt/bar', { encoding: 'utf-8' }, (err, content) => {
+            t.error(err, 'no error')
+            t.same(content, 'hello')
+            return resolve()
+          })
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('can rename a file without creating duplicates', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.writeFile('./mnt/foo', 'hello', err => {
+        t.error(err, 'no error')
+        fs.rename('./mnt/foo','./mnt/bar', err => {
+          t.error(err, 'no error')
+            fs.readdir('./mnt/', (err, list) => {
+              t.error(err, 'no error')
+              t.same(list, ['bar'])
+              return resolve()
+          })
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
+test('cannot rename a directory', async t => {
+  const drive = hyperdrive(ram)
+  const fuse = new HyperdriveFuse(drive, './mnt')
+
+  const onint = () => cleanup(fuse, true)
+  process.on('SIGINT', onint)
+
+  await fuse.mount()
+
+  try {
+    await new Promise(resolve => {
+      fs.mkdir('./mnt/foo', err => {
+        t.error(err, 'no error')
+        fs.rename('./mnt/foo','./mnt/bar', err => {
+          t.true(err)
+          t.same(err.errno,Fuse.EISDIR)
+          return resolve()
+        })
+      })
+    })
+  } catch (err) {
+    t.fail(err)
+  }
+
+  await cleanup(fuse)
+  process.removeListener('SIGINT', onint)
+  t.end()
+})
+
 async function writeData (numSlices, sliceSize) {
   const content = Buffer.alloc(sliceSize * numSlices).fill('0123456789abcdefghijklmnopqrstuvwxyz')
   let slices = new Array(numSlices).fill(0).map((_, i) => content.slice(sliceSize * i, sliceSize * (i + 1)))
