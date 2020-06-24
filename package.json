@@ -35,6 +35,7 @@
   "dependencies": {
     "dat-encoding": "^5.0.1",
     "filesystem-constants": "^1.0.0",
-    "fuse-native": "^2.2.0"
+    "fuse-native": "^2.2.0",
+    "mkdirp": "^1.0.4"
   }
 }
